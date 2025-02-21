@@ -365,27 +365,69 @@ public class Crate {
      * @param player the player that will be winning the prize.
      * @return {@link Prize}
      */
-    public Prize pickPrize(@NotNull final Player player) {
-        final List<Prize> prizes = new ArrayList<>();
+public Prize pickPrize(@NotNull final Player player) {
+    final List<Prize> prizes = new ArrayList<>();
 
+    // Step 1: Check if all rewards are blacklisted
+    boolean allBlacklisted = true;
+    for (Prize prize : getPrizes()) {
+        if (prize.getWeight() == -1) continue; // Skip prizes with weight -1
+
+        final int pulls = PrizeManager.getCurrentPulls(prize, this);
+
+        if (pulls != 0 && pulls >= prize.getMaxPulls()) {
+            // This reward is blacklisted (max pulls reached)
+            continue;
+        }
+
+        if (prize.hasPermission(player) && !player.isOp()) {
+            if (prize.hasAlternativePrize()) {
+                // This reward is blacklisted (permission-based)
+                continue;
+            }
+        }
+
+        // If we find at least one reward that isn't blacklisted, set allBlacklisted to false
+        allBlacklisted = false;
+    }
+
+    // Step 2: If all rewards are blacklisted, ignore the blacklist and pick a reward based on weight
+    if (allBlacklisted) {
         for (Prize prize : getPrizes()) {
-            if (prize.getWeight() == -1) continue;
-          
+            if (prize.getWeight() == -1) continue; // Skip prizes with weight -1
+            prizes.add(prize); // Add all rewards to the pool
+        }
+    } else {
+        // Step 3: If not all rewards are blacklisted, use the existing blacklisting logic
+        for (Prize prize : getPrizes()) {
+            if (prize.getWeight() == -1) continue; // Skip prizes with weight -1
+
             final int pulls = PrizeManager.getCurrentPulls(prize, this);
 
-             if (pulls != 0) {
-                if (pulls >= prize.getMaxPulls()) continue;
+            if (pulls != 0 && pulls >= prize.getMaxPulls()) {
+                // This reward is blacklisted (max pulls reached)
+                continue;
             }
 
             if (prize.hasPermission(player) && !player.isOp()) {
-                if (prize.hasAlternativePrize()) continue;
+                if (prize.hasAlternativePrize()) {
+                    // This reward is blacklisted (permission-based)
+                    continue;
+                }
             }
 
-            prizes.add(prize);
+            prizes.add(prize); // Add non-blacklisted rewards to the pool
         }
-
-        return getPrize(prizes);
     }
+
+    // Step 4: If no prizes are available, return null
+    if (prizes.isEmpty()) {
+        return null;
+    }
+
+    // Step 5: Pick a random prize based on weight
+    return getPrize(prizes);
+}
 
     /**
      * Picks a random prize based on BlackList Permissions and the Chance System. Only used in the Cosmic Crate and Casino Type since it is the only one with tiers.
